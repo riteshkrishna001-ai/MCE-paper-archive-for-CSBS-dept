@@ -1,0 +1,58 @@
+rules_version = '2';
+
+// NOTE: This file currently only covers the `users` collection, which is
+// what the Authentication phase touches. Rules for `papers`, `subjects`,
+// and `academicYears` (moderation visibility, upload validation, admin
+// actions) are added in full during the dedicated Security phase —
+// deploying this file in isolation will leave those collections
+// unprotected by default-deny until that phase lands.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /users/{uid} {
+      // A user can read their own profile; admins can read any profile
+      // (needed for the Pending Uploads review screen, built later).
+      allow read: if isOwner(uid) || isAdmin();
+
+      // First-time profile creation: only the user themselves, and only
+      // as a 'student'. Nobody can self-promote to admin from the client.
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.role == 'student'
+        && request.resource.data.uploadCount == 0
+        && request.resource.data.approvedCount == 0;
+
+      // Profile updates: the owner may refresh their own display fields,
+      // but never their own role or counters. Admins may update any
+      // field (e.g. to promote a user or correct counters).
+      allow update: if isAdmin() || (
+        isOwner(uid) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.uploadCount == resource.data.uploadCount &&
+        request.resource.data.approvedCount == resource.data.approvedCount
+      );
+
+      allow delete: if false; // No client-side account deletion in V1.
+    }
+
+    // Default-deny everything else until the Security phase fills it in.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

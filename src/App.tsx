@@ -15,7 +15,7 @@ import { AppRouter } from '@/router';
 export default function App() {
   return (
     <AppErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <div className="flex min-h-screen flex-col bg-surface text-ink dark:bg-surface-dark dark:text-ink-inverted">
             <Navbar />

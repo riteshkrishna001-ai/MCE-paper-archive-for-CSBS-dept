@@ -22,10 +22,10 @@ export type PaperStatus = 'pending' | 'approved' | 'rejected';
 /** Application-level role. Distinct from Firebase Auth's identity concept. */
 export type UserRole = 'student' | 'admin';
 
-/** Semesters offered in the CSBS curriculum (V1 covers 1–6). */
-export type SemesterNumber = 1 | 2 | 3 | 4 | 5 | 6;
+/** Semesters offered in the CSBS curriculum (V1 covers 3–8). */
+export type SemesterNumber = 3 | 4 | 5 | 6 | 7 | 8;
 
-export const SEMESTERS: SemesterNumber[] = [1, 2, 3, 4, 5, 6];
+export const SEMESTERS: SemesterNumber[] = [3, 4, 5, 6, 7, 8];
 
 /**
  * Academic year as a string in "YYYY-YY" form, e.g. "2024-25".

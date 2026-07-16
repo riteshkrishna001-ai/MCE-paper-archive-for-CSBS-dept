@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /papers/{uid}/{allPaths=**} {
+      // Allow download if the user is authenticated and uploader is the owner, or if they are admin,
+      // or if it's public. (For simplicity in Storage, we allow reading papers if authenticated or public).
+      allow read: if true;
+      
+      // Allow create/write if the uploader matches the path
+      allow create: if request.auth != null && request.auth.uid == uid;
+      
+      // Allow delete only for admins or the owner
+      allow delete: if request.auth != null && (request.auth.uid == uid || firestore.get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+  }
+}

@@ -1,12 +1,5 @@
 rules_version = '2';
 
-// NOTE: This file currently only covers the `users` collection, which is
-// what the Authentication phase touches. Rules for `papers`, `subjects`,
-// and `academicYears` (moderation visibility, upload validation, admin
-// actions) are added in full during the dedicated Security phase —
-// deploying this file in isolation will leave those collections
-// unprotected by default-deny until that phase lands.
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -25,21 +18,14 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      // A user can read their own profile; admins can read any profile
-      // (needed for the Pending Uploads review screen, built later).
       allow read: if isOwner(uid) || isAdmin();
-
-      // First-time profile creation: only the user themselves, and only
-      // as a 'student'. Nobody can self-promote to admin from the client.
+      
       allow create: if isOwner(uid)
         && request.resource.data.uid == uid
         && request.resource.data.role == 'student'
         && request.resource.data.uploadCount == 0
         && request.resource.data.approvedCount == 0;
 
-      // Profile updates: the owner may refresh their own display fields,
-      // but never their own role or counters. Admins may update any
-      // field (e.g. to promote a user or correct counters).
       allow update: if isAdmin() || (
         isOwner(uid) &&
         request.resource.data.role == resource.data.role &&
@@ -47,12 +33,41 @@ service cloud.firestore {
         request.resource.data.approvedCount == resource.data.approvedCount
       );
 
-      allow delete: if false; // No client-side account deletion in V1.
+      allow delete: if false;
     }
 
-    // Default-deny everything else until the Security phase fills it in.
-    match /{document=**} {
-      allow read, write: if false;
+    match /subjects/{subjectId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /academicYears/{yearId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /papers/{paperId} {
+      // Approved papers are public; pending/rejected papers are only visible to uploader and admins
+      allow read: if resource == null 
+        || resource.data.status == 'approved'
+        || (isSignedIn() && resource.data.uploadedBy == request.auth.uid)
+        || isAdmin();
+
+      // Signed in users can submit a pending paper
+      allow create: if isSignedIn()
+        && request.resource.data.uploadedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.downloadCount == 0;
+
+      // Admins can update anything.
+      // Anyone can increment the download count.
+      allow update: if isAdmin()
+        || (isSignedIn() && request.resource.data.uploadedBy == request.auth.uid 
+            && resource.data.status == 'pending' 
+            && request.resource.data.status == 'pending')
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['downloadCount']));
+
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.uploadedBy == request.auth.uid && resource.data.status == 'pending');
     }
   }
 }

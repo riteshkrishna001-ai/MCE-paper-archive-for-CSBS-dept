@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { getSubjects, getAcademicYears, checkDuplicatePaper, uploadPaperFile, createPaperRecord } from '@/services/dbService';
+import { getSubjects, checkDuplicatePaper, uploadPaperFile, createPaperRecord } from '@/services/dbService';
 import { MAX_PDF_SIZE_BYTES } from '@/config/constants';
-import type { Subject, AcademicYearRecord, ExamType, SemesterNumber } from '@/types';
+import type { Subject, ExamType, SemesterNumber } from '@/types';
 import { EXAM_TYPES, EXAM_TYPE_LABELS, SEMESTERS } from '@/types';
 import { Upload as UploadIcon, FileText, CheckCircle2, AlertTriangle, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -20,12 +20,10 @@ export default function Upload() {
   const [file, setFile] = useState<File | null>(null);
   const [semester, setSemester] = useState<SemesterNumber | ''>('');
   const [subjectId, setSubjectId] = useState('');
-  const [academicYear, setAcademicYear] = useState('');
   const [examType, setExamType] = useState<ExamType | ''>('');
 
   // Dropdown options loaded from Firestore
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [academicYears, setAcademicYears] = useState<AcademicYearRecord[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   // Submission/Verification states
@@ -44,19 +42,15 @@ export default function Upload() {
     if (subParam) setSubjectId(subParam);
   }, [searchParams]);
 
-  // Load subjects and years
+  // Load subjects
   useEffect(() => {
     async function loadData() {
       try {
-        const [loadedSubjects, loadedYears] = await Promise.all([
-          getSubjects(false),
-          getAcademicYears(),
-        ]);
+        const loadedSubjects = await getSubjects(false);
         setSubjects(loadedSubjects);
-        setAcademicYears(loadedYears);
       } catch (err) {
         console.error('Failed to load form options:', err);
-        toast.error('Failed to load subjects or academic years.');
+        toast.error('Failed to load subjects.');
       } finally {
         setLoadingData(false);
       }
@@ -86,7 +80,7 @@ export default function Upload() {
   };
 
   const handleNextToConfirmation = async () => {
-    if (!semester || !subjectId || !academicYear || !examType || !file) {
+    if (!semester || !subjectId || !examType || !file) {
       toast.error('Please fill in all details.');
       return;
     }
@@ -94,10 +88,10 @@ export default function Upload() {
     setCheckingDuplicate(true);
     setDuplicateWarning(null);
     try {
-      const duplicate = await checkDuplicatePaper(subjectId, academicYear, examType);
+      const duplicate = await checkDuplicatePaper(subjectId, examType);
       if (duplicate) {
         if (duplicate.status === 'approved') {
-          setDuplicateWarning('An approved question paper already exists for this exact combination. Please verify your details.');
+          setDuplicateWarning('An approved question paper already exists for this exact subject and exam type. Please verify your details.');
         } else {
           setDuplicateWarning('A paper with these details is currently pending moderation. Uploading another might be flagged as a duplicate.');
         }
@@ -125,34 +119,37 @@ export default function Upload() {
     }
 
     try {
-      // 1. Upload File to Storage
-      const { url, path } = await uploadPaperFile(file, currentUser.uid, (progress) => {
+      // 1. Process File & upload to Storage / Base64
+      const { url, path, base64Data } = await uploadPaperFile(file, currentUser.uid, (progress) => {
         setUploadProgress(Math.round(progress));
       });
 
-      // 2. Create DB Record
-      await createPaperRecord({
-        semester: semester as SemesterNumber,
-        subjectId,
-        subjectName: selectedSubject.name,
-        subjectCode: selectedSubject.code.toUpperCase(),
-        academicYear,
-        examType: examType as ExamType,
-        pdfUrl: url,
-        pdfStoragePath: path,
-        previewImageUrl: null,
-        previewImageStoragePath: null,
-        fileSize: file.size,
-        uploadedBy: currentUser.uid,
-        uploadedByName: profile.displayName,
-        uploadedByEmail: profile.email,
-      });
+      // 2. Save DB Record & Chunks
+      await createPaperRecord(
+        {
+          semester: semester as SemesterNumber,
+          subjectId,
+          subjectName: selectedSubject.name,
+          subjectCode: selectedSubject.code.toUpperCase(),
+          examType: examType as ExamType,
+          pdfUrl: url,
+          pdfStoragePath: path,
+          base64Data,
+          previewImageUrl: null,
+          previewImageStoragePath: null,
+          fileSize: file.size,
+          uploadedBy: currentUser.uid,
+          uploadedByName: profile.displayName,
+          uploadedByEmail: profile.email,
+        },
+        (progress) => setUploadProgress(Math.round(progress))
+      );
 
       toast.success('Paper uploaded successfully! It is now pending admin review.');
       navigate('/browse');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Upload failed:', err);
-      toast.error('Upload failed. Please try again.');
+      toast.error(`Upload failed: ${err?.message || 'Please try again.'}`);
     } finally {
       setUploading(false);
     }
@@ -251,7 +248,7 @@ export default function Upload() {
                   <div className="grid gap-5 sm:grid-cols-2">
                     
                     {/* Semester */}
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 sm:col-span-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Semester</label>
                       <select
                         value={semester}
@@ -264,21 +261,6 @@ export default function Upload() {
                         <option value="">Select Semester</option>
                         {SEMESTERS.map((sem: SemesterNumber) => (
                           <option key={sem} value={sem}>Semester {sem}</option>
-                        )) /* type-cast sem */}
-                      </select>
-                    </div>
-
-                    {/* Academic Year */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-400">Academic Year</label>
-                      <select
-                        value={academicYear}
-                        onChange={(e) => setAcademicYear(e.target.value)}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm dark:border-slate-750 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-                      >
-                        <option value="">Select Academic Year</option>
-                        {academicYears.map((yr) => (
-                          <option key={yr.id} value={yr.year}>{yr.year}</option>
                         ))}
                       </select>
                     </div>
@@ -373,10 +355,6 @@ export default function Upload() {
                       <strong className="text-slate-900 dark:text-white">
                         {examType ? EXAM_TYPE_LABELS[examType] : ''}
                       </strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Academic Year:</span>
-                      <strong className="text-slate-900 dark:text-white">{academicYear}</strong>
                     </div>
                   </div>
 

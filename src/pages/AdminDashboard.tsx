@@ -8,6 +8,7 @@ import {
   addSubject,
   getAcademicYears,
   addAcademicYear,
+  getPaperPdfUrl,
 } from '@/services/dbService';
 import { isValidAcademicYear } from '@/types';
 import type { Paper, Subject, AcademicYearRecord, SemesterNumber } from '@/types';
@@ -87,8 +88,17 @@ export default function AdminDashboard() {
   const [pendingPapers, setPendingPapers] = useState<Paper[]>([]);
   const [loadingPapers, setLoadingPapers] = useState(true);
   const [viewingPaper, setViewingPaper] = useState<Paper | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejectingPaperId, setRejectingPaperId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!viewingPaper) {
+      setPreviewUrl(null);
+      return;
+    }
+    getPaperPdfUrl(viewingPaper).then((url) => setPreviewUrl(url));
+  }, [viewingPaper]);
 
   // Tab 2: Manage Subjects
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -351,7 +361,7 @@ export default function AdminDashboard() {
                         {paper.subjectName}
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        {EXAM_TYPE_LABELS[paper.examType]} ({paper.academicYear}) • Uploaded by {paper.uploadedByName}
+                        {EXAM_TYPE_LABELS[paper.examType]}{paper.academicYear ? ` (${paper.academicYear})` : ''} • Uploaded by {paper.uploadedByName}
                       </p>
                     </div>
 
@@ -402,15 +412,15 @@ export default function AdminDashboard() {
                       Close
                     </button>
                   </div>
-                  {viewingPaper.pdfUrl ? (
+                  {previewUrl ? (
                     <iframe
-                      src={`${viewingPaper.pdfUrl}#toolbar=0`}
+                      src={`${previewUrl}#toolbar=0`}
                       className="w-full h-80 rounded-xl bg-slate-100"
                       title="PDF Preview"
                     />
                   ) : (
                     <div className="w-full h-80 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 text-xs">
-                      No document URL
+                      Loading preview...
                     </div>
                   )}
                 </div>

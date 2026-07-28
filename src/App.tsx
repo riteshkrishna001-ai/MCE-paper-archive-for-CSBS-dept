@@ -22,6 +22,19 @@ export default function App() {
             <main className="flex-1">
               <AppRouter />
             </main>
+            <footer style={{
+              textAlign: 'center',
+              padding: '10px 0',
+              fontSize: '0.78rem',
+              letterSpacing: '0.04em',
+              color: 'rgba(150,150,170,0.85)',
+              background: 'rgba(20,20,30,0.72)',
+              borderTop: '1px solid rgba(255,255,255,0.07)',
+              backdropFilter: 'blur(8px)',
+              userSelect: 'none',
+            }}>
+              Made by <strong style={{ color: 'rgba(190,190,220,0.95)' }}>Ritesh Krishna</strong> &nbsp;|&nbsp; 4MC24CB038
+            </footer>
           </div>
           <Toaster position="top-center" toastOptions={{ duration: 3500 }} />
         </AuthProvider>

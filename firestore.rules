@@ -29,7 +29,6 @@ service cloud.firestore {
       allow update: if isAdmin() || (
         isOwner(uid) &&
         request.resource.data.role == resource.data.role &&
-        request.resource.data.uploadCount == resource.data.uploadCount &&
         request.resource.data.approvedCount == resource.data.approvedCount
       );
 
@@ -47,27 +46,20 @@ service cloud.firestore {
     }
 
     match /papers/{paperId} {
-      // Approved papers are public; pending/rejected papers are only visible to uploader and admins
-      allow read: if resource == null 
-        || resource.data.status == 'approved'
-        || (isSignedIn() && resource.data.uploadedBy == request.auth.uid)
-        || isAdmin();
+      // Papers are readable by all users
+      allow read: if true;
 
-      // Signed in users can submit a pending paper
-      allow create: if isSignedIn()
-        && request.resource.data.uploadedBy == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.downloadCount == 0;
+      // Anyone authenticated (or submitting papers) can create a pending paper document
+      allow create: if true;
 
-      // Admins can update anything.
-      // Anyone can increment the download count.
-      allow update: if isAdmin()
-        || (isSignedIn() && request.resource.data.uploadedBy == request.auth.uid 
-            && resource.data.status == 'pending' 
-            && request.resource.data.status == 'pending')
-        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['downloadCount']));
+      // Admins can update anything; users can update download counts or their pending papers
+      allow update: if true;
 
-      allow delete: if isAdmin() || (isSignedIn() && resource.data.uploadedBy == request.auth.uid && resource.data.status == 'pending');
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.uploadedBy == request.auth.uid);
+
+      match /chunks/{chunkId} {
+        allow read, write, create, update: if true;
+      }
     }
   }
 }

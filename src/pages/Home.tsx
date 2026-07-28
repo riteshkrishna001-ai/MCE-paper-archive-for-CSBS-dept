@@ -65,11 +65,12 @@ export default function Home() {
   };
 
   const handleDownload = async (paper: Paper) => {
-    if (!paper.pdfUrl) return;
     try {
-      window.open(paper.pdfUrl, '_blank');
+      const { incrementDownloadCount, getPaperPdfUrl } = await import('@/services/dbService');
+      const pdfUrl = await getPaperPdfUrl(paper);
+      if (!pdfUrl) return;
+      window.open(pdfUrl, '_blank');
       // Increment download count in Firestore
-      const { incrementDownloadCount } = await import('@/services/dbService');
       await incrementDownloadCount(paper.id);
       // Update local state
       setLatestPapers(prev => 
@@ -204,7 +205,7 @@ export default function Home() {
                         {paper.subjectCode} - {paper.subjectName}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        {paper.examType} ({paper.academicYear})
+                        {paper.examType}{paper.academicYear ? ` (${paper.academicYear})` : ''}
                       </p>
                       <div className="flex items-center gap-2 mt-2 text-[10px] text-slate-400">
                         <span>By {paper.uploadedByName}</span>

@@ -18,7 +18,7 @@ export interface Paper {
   subjectId: string;
   subjectName: string;
   subjectCode: string;
-  academicYear: AcademicYear;
+  academicYear?: AcademicYear | null;
   examType: ExamType;
 
   // --- File data ---
@@ -55,7 +55,7 @@ export interface Paper {
 export interface PaperUploadInput {
   semester: SemesterNumber;
   subjectId: string;
-  academicYear: AcademicYear;
+  academicYear?: AcademicYear | null;
   examType: ExamType;
   file: File;
 }
@@ -65,7 +65,7 @@ export interface PaperUploadInput {
 export interface PaperSlot {
   semester: SemesterNumber;
   subjectId: string;
-  academicYear: AcademicYear;
+  academicYear?: AcademicYear | null;
   examType: ExamType;
   paper: Paper | null;
 }

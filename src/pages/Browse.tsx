@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { getSubjects, getAcademicYears, getPapers, incrementDownloadCount } from '@/services/dbService';
+import { getSubjects, getAcademicYears, getPapers, incrementDownloadCount, getPaperPdfUrl } from '@/services/dbService';
 import type { Subject, AcademicYearRecord, Paper } from '@/types';
 import { SEMESTERS, EXAM_TYPES, EXAM_TYPE_LABELS } from '@/types';
 import { FileText, Download, Upload, AlertCircle, RefreshCw, Search } from 'lucide-react';
@@ -60,9 +60,10 @@ export default function Browse() {
   };
 
   const handleDownload = async (paper: Paper) => {
-    if (!paper.pdfUrl) return;
     try {
-      window.open(paper.pdfUrl, '_blank');
+      const pdfUrl = await getPaperPdfUrl(paper);
+      if (!pdfUrl) return;
+      window.open(pdfUrl, '_blank');
       await incrementDownloadCount(paper.id);
       // Increment counter in local state
       setPapers((prev) =>
@@ -255,9 +256,11 @@ export default function Browse() {
                                 <FileText className="h-3.5 w-3.5" />
                                 {EXAM_TYPE_LABELS[paper.examType]}
                               </span>
-                              <span className="text-xs text-slate-500 dark:text-slate-400">
-                                {paper.academicYear}
-                              </span>
+                              {paper.academicYear && (
+                                <span className="text-xs text-slate-500 dark:text-slate-400">
+                                  {paper.academicYear}
+                                </span>
+                              )}
                             </div>
                             
                             <p className="text-xs text-slate-400 mt-3">
